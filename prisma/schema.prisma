@@ -26,6 +26,12 @@ model Company {
   partialAssessments        PartialAssessment[]
   auditLogs                 AuditLog[]
   scheduledImports          ScheduledImport[]
+  // SPMS organizational structure — additive; legacy users and evaluations unchanged.
+  organizationUnits         OrganizationUnit[]
+  organizationPositions     OrganizationPosition[]
+  positionAssignments       PositionAssignment[]
+  unitCollaborations        UnitCollaboration[]
+  orgDelegations            OrgDelegation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -68,6 +74,10 @@ model User {
   company                      Company                    @relation(fields: [companyId], references: [id])
   manager                      User?                      @relation("ManagerEmployee", fields: [managerId], references: [id])
   employees                    User[]                     @relation("ManagerEmployee")
+  // Role/position assignments are time-bound and independent of a person's name.
+  positionAssignments          PositionAssignment[]
+  grantedDelegations           OrgDelegation[]           @relation("OrgDelegationGrantor")
+  receivedDelegations          OrgDelegation[]           @relation("OrgDelegationGrantee")
   evaluationsGiven             Evaluation[]               @relation("ManagerEvaluations")
   evaluationsReceived          Evaluation[]               @relation("EmployeeEvaluations")
   evaluationsReopened          Evaluation[]               @relation("EvaluationReopenedBy")
@@ -367,4 +377,144 @@ model ScheduledImport {
   @@unique([companyId, name])
   @@index([nextRun, enabled])
   @@index([companyId, status])
+}
+
+
+// -----------------------------------------------------------------------------
+// Smart Masar SPMS: organizational structure foundation (additive, phase 1).
+// A position exists independently from its occupant. Empty positions are valid.
+// A reporting line follows positions; lateral links do not grant staff-evaluation
+// permissions. All new tables are company-scoped. Existing demo data untouched.
+// -----------------------------------------------------------------------------
+
+model OrganizationUnit {
+  id           String   @id @default(cuid())
+  companyId    String
+  code         String
+  nameAr       String
+  nameEn       String?
+  unitType     String   @default("department") // company, division, department, team, project
+  parentId     String?
+  sortOrder    Int      @default(0)
+  active       Boolean  @default(true)
+  effectiveFrom DateTime @default(now())
+  effectiveTo  DateTime?
+  description  String?
+
+  company      Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  parent       OrganizationUnit?  @relation("SPMSUnitTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children     OrganizationUnit[] @relation("SPMSUnitTree")
+  positions    OrganizationPosition[]
+  outgoingLinks UnitCollaboration[] @relation("SPMSUnitLinkSource")
+  incomingLinks UnitCollaboration[] @relation("SPMSUnitLinkTarget")
+  scopedDelegations OrgDelegation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, code])
+  @@index([companyId, parentId])
+  @@index([companyId, active])
+}
+
+model OrganizationPosition {
+  id           String  @id @default(cuid())
+  companyId    String
+  unitId       String
+  code         String
+  titleAr      String
+  titleEn      String?
+  purpose      String?
+  responsibilities Json?
+  permissionProfile String? // Future RBAC policy reference, not an access grant
+  reportsToId  String?
+  active       Boolean @default(true)
+  sortOrder    Int     @default(0)
+
+  company      Company          @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  unit         OrganizationUnit @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  reportsTo    OrganizationPosition? @relation("SPMSPositionTree", fields: [reportsToId], references: [id], onDelete: Restrict)
+  directReports OrganizationPosition[] @relation("SPMSPositionTree")
+  assignments  PositionAssignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, code])
+  @@index([companyId, unitId])
+  @@index([companyId, reportsToId])
+}
+
+// Preserves assignment history when an employee changes role or manager.
+// A vacant role is a position with no current active assignment.
+model PositionAssignment {
+  id           String   @id @default(cuid())
+  companyId    String
+  positionId   String
+  userId       String
+  assignmentType String @default("primary") // primary, acting, temporary
+  effectiveFrom DateTime @default(now())
+  effectiveTo  DateTime?
+  active       Boolean @default(true)
+  reason       String?
+
+  company      Company              @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  position     OrganizationPosition @relation(fields: [positionId], references: [id], onDelete: Restrict)
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, userId, active])
+  @@index([companyId, positionId, active])
+  @@index([positionId, effectiveFrom, effectiveTo])
+}
+
+// A horizontal coordination link between units; does not imply supervision.
+model UnitCollaboration {
+  id          String @id @default(cuid())
+  companyId   String
+  sourceUnitId String
+  targetUnitId String
+  linkType    String @default("collaborates_with")
+  scope       String?
+  effectiveFrom DateTime @default(now())
+  effectiveTo DateTime?
+  active      Boolean @default(true)
+
+  company     Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  sourceUnit  OrganizationUnit @relation("SPMSUnitLinkSource", fields: [sourceUnitId], references: [id], onDelete: Restrict)
+  targetUnit  OrganizationUnit @relation("SPMSUnitLinkTarget", fields: [targetUnitId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, sourceUnitId])
+  @@index([companyId, targetUnitId])
+}
+
+model OrgDelegation {
+  id           String @id @default(cuid())
+  companyId    String
+  grantorId    String
+  granteeId    String
+  scopeUnitId  String?
+  permission   String // Explicit action key, evaluated on the server
+  reason       String?
+  effectiveFrom DateTime @default(now())
+  effectiveTo  DateTime
+  revokedAt    DateTime?
+  active       Boolean @default(true)
+
+  company      Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  grantor      User @relation("OrgDelegationGrantor", fields: [grantorId], references: [id], onDelete: Restrict)
+  grantee      User @relation("OrgDelegationGrantee", fields: [granteeId], references: [id], onDelete: Restrict)
+  scopeUnit    OrganizationUnit? @relation(fields: [scopeUnitId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, granteeId, active])
+  @@index([companyId, scopeUnitId])
+  @@index([effectiveTo])
 }
