@@ -1,0 +1,370 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id        String  @id @default(cuid())
+  name      String
+  code      String  @unique
+  active    Boolean @default(true)
+  aiEnabled Boolean @default(false) // Feature flag for AI functionality
+  aiFeatures Json?                  // Future granular AI feature configuration
+
+  users                     User[]
+  evaluations               Evaluation[]
+  evaluationItems           EvaluationItem[]
+  evaluationItemAssignments EvaluationItemAssignment[]
+  performanceCycles         PerformanceCycle[]
+  partialAssessments        PartialAssessment[]
+  auditLogs                 AuditLog[]
+  scheduledImports          ScheduledImport[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id        String  @id @default(cuid())
+  companyId String
+  email     String?
+  username  String?
+  name      String
+  role      String // "employee" | "manager" | "hr"
+  managerId String?
+  active    Boolean @default(true)
+
+  // Authentication fields
+  passwordHash    String?
+  pinCode         String?
+  userType        String  @default("office") // "office" | "operational"  
+  loginMethod     String  @default("email") // "email" | "username" | "qr"
+  requiresPinOnly Boolean @default(false)
+
+  // Employee details
+  employeeId String? // Company-assigned employee number
+  personID   String? // National ID number (cédula, DNI, etc.)
+  department String?
+  position   String? // Job title/position (e.g., "Front Desk Agent", "Executive Chef", "Housekeeping Supervisor")
+  shift      String?
+  lastLogin  DateTime?
+
+  // Archive snapshot fields
+  archivedAt          DateTime? // When the user was archived
+  archivedReason      String?   // Optional reason for archiving (future HRIS integration)
+  archivedManagerName String?   // Manager name at time of archiving
+  archivedManagerEmail String?  // Manager email at time of archiving
+  archivedDepartment  String?   // Department at time of archiving
+  archivedPosition    String?   // Position at time of archiving
+  archivedCompanyName String?   // Company name at time of archiving
+
+  company                      Company                    @relation(fields: [companyId], references: [id])
+  manager                      User?                      @relation("ManagerEmployee", fields: [managerId], references: [id])
+  employees                    User[]                     @relation("ManagerEmployee")
+  evaluationsGiven             Evaluation[]               @relation("ManagerEvaluations")
+  evaluationsReceived          Evaluation[]               @relation("EmployeeEvaluations")
+  evaluationsReopened          Evaluation[]               @relation("EvaluationReopenedBy")
+  createdEvaluationItems       EvaluationItem[]           @relation("CreatedEvaluationItems")
+  deadlineAssignments          EvaluationItem[]           @relation("DeadlineSetBy")
+  archivedEvaluationItems      EvaluationItem[]           @relation("ArchivedEvaluationItems")
+  employeeAssignments          EvaluationItemAssignment[] @relation("EmployeeAssignments")
+  managerAssignments           EvaluationItemAssignment[] @relation("AssignedByManager")
+  auditLogs                    AuditLog[]
+  createdCycles                PerformanceCycle[]         @relation("CycleCreatedBy")
+  closedCycles                 PerformanceCycle[]         @relation("CycleClosedBy")
+  partialAssessmentsAsEmployee PartialAssessment[]        @relation("PartialAssessmentEmployee")
+  partialAssessmentsAsAssessor PartialAssessment[]        @relation("PartialAssessmentAssessor")
+  biometricCredentials         BiometricCredential[]      @relation("UserBiometricCredentials")
+  createdScheduledImports      ScheduledImport[]          @relation("ScheduledImportCreatedBy")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, email])
+  @@unique([companyId, username])
+  @@unique([companyId, employeeId]) // Employee ID unique per company (HRIS integration)
+  @@unique([companyId, personID]) // National ID unique per company (for data isolation)
+  
+  // Performance indexes
+  @@index([companyId])
+  @@index([managerId])
+  @@index([active])
+  @@index([role])
+  @@index([department])
+  @@index([companyId, active])
+  @@index([managerId, active])
+  @@index([companyId, role, active])
+  @@index([companyId, active, archivedAt]) // Archive queries optimization
+}
+
+model Evaluation {
+  id         String  @id @default(cuid())
+  employeeId String
+  managerId  String
+  companyId  String
+  cycleId    String? // Foreign key to PerformanceCycle (nullable for backwards compatibility)
+  periodType String // "monthly" | "quarterly" | "semester" | "yearly"
+  periodDate String // "2024-Q1" | "2024-03" 
+
+  // JSON data for flexibility
+  evaluationItemsData String? // JSON string - unified OKRs and competencies
+
+  overallRating   Int? // 1-5 scale
+  managerComments String?
+  status          String  @default("draft") // "draft" | "submitted" | "completed"
+  
+  // Robust evaluation state tracking
+  isReopened       Boolean   @default(false) // True if evaluation was reopened after being submitted/completed
+  previousStatus   String?   // Previous status before reopening ("submitted" | "completed")
+  reopenedAt       DateTime? // When the evaluation was last reopened
+  reopenedBy       String?   // User ID who reopened the evaluation
+  reopenedReason   String?   // Reason for reopening (e.g., "New company items added")
+  completionCount  Int       @default(0) // How many times this evaluation has been completed (0=never, 1=once, 2+=multiple times)
+
+  employee    User              @relation("EmployeeEvaluations", fields: [employeeId], references: [id])
+  manager     User              @relation("ManagerEvaluations", fields: [managerId], references: [id])
+  company     Company           @relation(fields: [companyId], references: [id])
+  cycle       PerformanceCycle? @relation(fields: [cycleId], references: [id])
+  reopenedByUser User?          @relation("EvaluationReopenedBy", fields: [reopenedBy], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([employeeId, periodType, periodDate])
+  
+  // Performance indexes
+  @@index([companyId])
+  @@index([employeeId])
+  @@index([managerId])
+  @@index([cycleId])
+  @@index([status])
+  @@index([isReopened])
+  @@index([reopenedBy])
+  @@index([companyId, status])
+  @@index([managerId, status])
+  @@index([employeeId, status])
+  @@index([cycleId, status])
+  @@index([companyId, cycleId, status])
+  @@index([companyId, isReopened])
+  @@index([managerId, isReopened])
+}
+
+model EvaluationItem {
+  id          String  @id @default(cuid())
+  companyId   String
+  cycleId     String? // Foreign key to PerformanceCycle (nullable for backwards compatibility)
+  title       String
+  description String
+
+  // Item type: "okr" or "competency" 
+  type String // "okr" | "competency"
+
+  // Three-tier assignment system
+  level      String // "company" | "department" | "manager"
+  createdBy  String // HR user ID or Manager user ID
+  assignedTo String? // Department name or specific manager ID
+
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  // Evaluation deadline fields
+  evaluationDeadline DateTime?
+  deadlineSetBy      String? // User ID who set the deadline
+
+  // Archive snapshot fields (following user archive pattern)
+  archivedAt         DateTime? // When the item was archived
+  archivedBy         String?   // User ID who archived the item
+  archivedReason     String?   // Reason for archiving
+
+  company               Company                    @relation(fields: [companyId], references: [id])
+  cycle                 PerformanceCycle?          @relation(fields: [cycleId], references: [id])
+  creator               User                       @relation("CreatedEvaluationItems", fields: [createdBy], references: [id])
+  deadlineSetByUser     User?                      @relation("DeadlineSetBy", fields: [deadlineSetBy], references: [id])
+  archivedByUser        User?                      @relation("ArchivedEvaluationItems", fields: [archivedBy], references: [id])
+  individualAssignments EvaluationItemAssignment[]
+  partialAssessments    PartialAssessment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Performance indexes
+  @@index([companyId])
+  @@index([cycleId])
+  @@index([level])
+  @@index([active])
+  @@index([assignedTo])
+  @@index([companyId, active])
+  @@index([cycleId, active])
+  @@index([companyId, level, active])
+}
+
+model EvaluationItemAssignment {
+  id               String @id @default(cuid())
+  evaluationItemId String
+  employeeId       String
+  assignedBy       String // Manager who made the assignment
+  companyId        String
+
+  evaluationItem EvaluationItem @relation(fields: [evaluationItemId], references: [id], onDelete: Cascade)
+  employee       User           @relation("EmployeeAssignments", fields: [employeeId], references: [id])
+  assignedByUser User           @relation("AssignedByManager", fields: [assignedBy], references: [id])
+  company        Company        @relation(fields: [companyId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([evaluationItemId, employeeId])
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  timestamp    DateTime @default(now())
+  
+  // Actor information
+  userId       String
+  userRole     String   // Role at time of action
+  ipAddress    String?
+  userAgent    String?
+  sessionId    String?  // For correlating related actions
+  
+  // Action details
+  action       String   // "create" | "update" | "delete" | "view" | "export" | "submit" | "approve" | "unlock" | "login" | "logout"
+  entityType   String   // "evaluation" | "user" | "cycle" | "item" | "assignment" | "partial_assessment"
+  entityId     String?  // ID of the affected entity
+  
+  // Target information (when action affects another user)
+  targetUserId String?  // e.g., employee being evaluated
+  
+  // Change tracking
+  oldData      Json?    // Previous state
+  newData      Json?    // New state
+  metadata     Json?    // Additional context (e.g., export parameters, search filters)
+  
+  // Compliance
+  reason       String?  // Why this action was taken (for sensitive operations)
+  companyId    String
+  
+  // Relations
+  user         User     @relation(fields: [userId], references: [id])
+  company      Company  @relation(fields: [companyId], references: [id])
+  
+  // Indexes for performance
+  @@index([userId, timestamp])
+  @@index([entityType, entityId])
+  @@index([companyId, timestamp])
+  @@index([action, timestamp])
+  @@index([targetUserId])
+}
+
+model PerformanceCycle {
+  id        String    @id @default(cuid())
+  companyId String
+  name      String // "2024 Annual Review", "Q1 2024"
+  startDate DateTime
+  endDate   DateTime
+  status    String    @default("active") // "active" | "closed" | "archived"
+  createdBy String // HR user ID who created it
+  closedBy  String? // HR user ID who closed it
+  closedAt  DateTime?
+
+  company            Company             @relation(fields: [companyId], references: [id])
+  createdByUser      User                @relation("CycleCreatedBy", fields: [createdBy], references: [id])
+  closedByUser       User?               @relation("CycleClosedBy", fields: [closedBy], references: [id])
+  evaluations        Evaluation[]
+  evaluationItems    EvaluationItem[]
+  partialAssessments PartialAssessment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, name])
+}
+
+model PartialAssessment {
+  id               String   @id @default(cuid())
+  cycleId          String
+  employeeId       String
+  evaluationItemId String
+  rating           Int? // 1-5 scale
+  comment          String?
+  assessedBy       String // Manager/HR user ID
+  assessedAt       DateTime @default(now())
+  evaluationDate   DateTime // When the actual evaluation/performance occurred
+  isActive         Boolean  @default(true) // Latest version flag
+  assessmentType   String // "manager_initial" | "hr_adjustment" | "manager_update"
+  companyId        String
+
+  cycle          PerformanceCycle @relation(fields: [cycleId], references: [id])
+  employee       User             @relation("PartialAssessmentEmployee", fields: [employeeId], references: [id])
+  evaluationItem EvaluationItem   @relation(fields: [evaluationItemId], references: [id])
+  assessedByUser User             @relation("PartialAssessmentAssessor", fields: [assessedBy], references: [id])
+  company        Company          @relation(fields: [companyId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cycleId, employeeId, evaluationItemId, isActive])
+}
+
+model BiometricCredential {
+  id           String @id @default(cuid())
+  userId       String
+  credentialId String @unique // WebAuthn credential ID
+  publicKey    String // Base64 encoded public key
+  deviceName   String? // Optional device name for user identification
+  deviceType   String // "face_id" | "touch_id" | "fingerprint" | "other"
+  counter      Int    @default(0) // WebAuthn signature counter
+  isActive     Boolean @default(true)
+  lastUsed     DateTime?
+
+  user User @relation("UserBiometricCredentials", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, credentialId])
+}
+
+model ScheduledImport {
+  id           String    @id @default(cuid())
+  companyId    String
+  name         String    // "Daily HRIS Sync", "Weekly Employee Import"
+  description  String?   // Optional description
+  enabled      Boolean   @default(true)
+  
+  // Schedule configuration
+  schedule     Json      // { frequency, time, dayOfWeek, dayOfMonth, timezone }
+  
+  // Source configuration  
+  source       Json      // { type, url, credentials, headers }
+  
+  // Import options
+  importOptions Json     // UpsertOptions + notificationEmails, validateOnly
+  
+  // Execution tracking
+  lastRun      DateTime?
+  nextRun      DateTime?
+  status       String    @default("active") // "active" | "paused" | "error" | "disabled"
+  errorMessage String?
+  
+  // Metadata
+  createdBy    String
+  
+  // Relations
+  company        Company @relation(fields: [companyId], references: [id])
+  createdByUser  User    @relation("ScheduledImportCreatedBy", fields: [createdBy], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([companyId, name])
+  @@index([nextRun, enabled])
+  @@index([companyId, status])
+}

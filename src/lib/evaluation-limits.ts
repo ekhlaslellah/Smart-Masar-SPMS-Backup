@@ -1,0 +1,165 @@
+/**
+ * Evaluation Item Limit Management
+ * 
+ * Comprehensive system for managing and enforcing evaluation item limits per employee
+ * to ensure manageable workloads and maintain evaluation quality. Prevents evaluation
+ * overload while providing flexible assignment strategies across organizational levels.
+ * 
+ * Key Features:
+ * - Maximum evaluation item limits per employee (configurable)
+ * - Multi-level item assignment tracking (company, department, individual)
+ * - Bulk validation for organizational-level item assignments
+ * - Employee impact analysis for new item creation
+ * - Comprehensive counting algorithms including all assignment types
+ * - Proactive limit violation prevention
+ * 
+ * Assignment Hierarchy:
+ * - Company-wide items: Apply to all employees automatically
+ * - Department items: Apply to all employees in specific departments
+ * - Department items: Apply to all employees in specific departments
+ * - Individual assignments: Manually assigned to specific employees
+ * 
+ * Limit Enforcement:
+ * - Default maximum: 10 evaluation items per employee
+ * - Real-time validation during item creation and assignment
+ * - Bulk validation for organizational changes
+ * - Detailed reporting of employees who would exceed limits
+ * - Granular control over assignment strategies
+ * 
+ * Business Benefits:
+ * - Prevents evaluation fatigue and overload
+ * - Ensures consistent workload distribution
+ * - Maintains evaluation quality through manageable scope
+ * - Provides visibility into assignment impact before execution
+ * - Supports strategic evaluation planning
+ * 
+ * Integration:
+ * - Real-time validation in assignment workflows
+ * - Administrative tools for limit monitoring
+ * - Reporting capabilities for evaluation planning
+ * - Flexible configuration for different organizational needs
+ */
+
+import { prisma } from '@/lib/prisma-client'
+
+// Maximum number of OKRs/competencies per employee (excluding overall score)
+export const MAX_EVALUATION_ITEMS = 10
+
+/**
+ * Count total evaluation items assigned to an employee
+ * Includes company-wide, department-wide, and individual assignments
+ */
+export async function countEmployeeEvaluationItems(employeeId: string, companyId: string): Promise<number> {
+  // Get employee info to determine department and manager
+  const employee = await prisma.user.findUnique({
+    where: { id: employeeId },
+    select: {
+      department: true,
+      managerId: true
+    }
+  })
+
+  if (!employee) {
+    return 0
+  }
+
+  // Get all evaluation items that apply to this employee
+  const [companyItems, departmentItems, individualAssignments] = await Promise.all([
+    // Company-wide items (apply to all employees)
+    prisma.evaluationItem.count({
+      where: {
+        companyId,
+        active: true,
+        level: 'company'
+      }
+    }),
+
+    // Department-level items
+    prisma.evaluationItem.count({
+      where: {
+        companyId,
+        active: true,
+        level: 'department',
+        assignedTo: employee.department
+      }
+    }),
+
+    // Individual assignments
+    prisma.evaluationItemAssignment.count({
+      where: {
+        employeeId,
+        companyId,
+        evaluationItem: {
+          active: true
+        }
+      }
+    })
+  ])
+
+  return companyItems + departmentItems + individualAssignments
+}
+
+/**
+ * Check if adding new items would exceed the limit for specific employees
+ * Used when creating company/department level items that will affect multiple employees
+ */
+export async function validateItemLimitForEmployees(
+  employeeIds: string[], 
+  companyId: string,
+  additionalItemsCount: number = 1
+): Promise<{
+  valid: boolean
+  exceededEmployees: Array<{ id: string; name: string; currentCount: number; wouldExceed: number }>
+}> {
+  const exceededEmployees: Array<{ id: string; name: string; currentCount: number; wouldExceed: number }> = []
+
+  for (const employeeId of employeeIds) {
+    const currentCount = await countEmployeeEvaluationItems(employeeId, companyId)
+    const wouldExceed = currentCount + additionalItemsCount
+
+    if (wouldExceed > MAX_EVALUATION_ITEMS) {
+      const employee = await prisma.user.findUnique({
+        where: { id: employeeId },
+        select: { name: true }
+      })
+
+      exceededEmployees.push({
+        id: employeeId,
+        name: employee?.name || 'Unknown',
+        currentCount,
+        wouldExceed
+      })
+    }
+  }
+
+  return {
+    valid: exceededEmployees.length === 0,
+    exceededEmployees
+  }
+}
+
+/**
+ * Get all employees who would be affected by a company or department level item
+ */
+export async function getAffectedEmployees(
+  level: 'company' | 'department',
+  assignedTo: string | null,
+  companyId: string
+): Promise<string[]> {
+  let whereClause: { companyId: string; active: boolean; department?: string; managerId?: string } = { companyId, active: true }
+
+  if (level === 'company') {
+    // All employees in the company
+    whereClause = { companyId, active: true }
+  } else if (level === 'department' && assignedTo) {
+    // All employees in the specified department
+    whereClause = { companyId, active: true, department: assignedTo }
+  }
+
+  const employees = await prisma.user.findMany({
+    where: whereClause,
+    select: { id: true }
+  })
+
+  return employees.map(emp => emp.id)
+}

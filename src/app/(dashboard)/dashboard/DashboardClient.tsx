@@ -1,0 +1,172 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { PDFExportCenter } from '@/components/features/dashboard'
+import { useLanguage } from '@/contexts/LanguageContext'
+import type { EvaluationCycle } from '@/types'
+import {
+  DashboardHeader,
+  DashboardMetrics,
+  CriticalActionsAlert,
+  OverdueDraftsCard,
+  PendingApprovalsCard,
+  AdministrativeActionsPanel
+} from './components'
+
+interface CompletionStats {
+  total: number
+  completed: number
+  inProgress: number
+  pending: number
+  overdue: number
+  duesSoon: number
+}
+
+interface RatingDistribution {
+  outstanding: number
+  exceeds: number
+  meets: number
+  below: number
+  needs: number
+}
+
+interface PerformanceCycle {
+  id: string
+  name: string
+  status: string
+  startDate: string
+  endDate: string
+  createdBy: string
+  closedBy?: string | null
+  closedAt?: string | null
+  _count: {
+    evaluations: number
+    evaluationItems: number
+    partialAssessments: number
+  }
+}
+
+interface OverdueDraft {
+  id: string
+  employeeName: string
+  employeeDepartment: string | null
+  managerName: string
+  createdAt: string
+  daysOverdue: number
+}
+
+interface PendingApproval {
+  id: string
+  employeeId: string
+  employeeName: string
+  employeeDepartment: string | null
+  managerName: string
+  submittedAt: string
+  daysPending: number
+}
+
+interface DashboardClientProps {
+  userRole: string
+  companyId: string
+  companyName: string
+  completionStats: CompletionStats
+  ratingDistribution: RatingDistribution
+  activeCycle: EvaluationCycle | null
+  allCycles: PerformanceCycle[]
+  overdueDrafts: OverdueDraft[]
+  pendingApprovals: PendingApproval[]
+  overdueApprovalsCount: number
+}
+
+export default function DashboardClient({
+  companyId,
+  companyName,
+  completionStats,
+  ratingDistribution,
+  activeCycle,
+  allCycles,
+  overdueDrafts,
+  pendingApprovals,
+  overdueApprovalsCount
+}: DashboardClientProps) {
+  const { t } = useLanguage()
+  const [isExportCenterOpen, setIsExportCenterOpen] = useState(false)
+  const [currentTime, setCurrentTime] = useState<string>('')
+
+  // Update time only on client-side to prevent hydration mismatch
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date()
+      setCurrentTime(`${now.toLocaleDateString()} at ${now.toLocaleTimeString()}`)
+    }
+    
+    updateTime() // Set initial time
+    const interval = setInterval(updateTime, 60000) // Update every minute
+    
+    return () => clearInterval(interval)
+  }, [])
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+      {/* Dashboard Header */}
+      <DashboardHeader 
+        companyName={companyName}
+        activeCycle={activeCycle}
+        allCycles={allCycles}
+      />
+
+      {/* Main Dashboard Content */}
+      <main className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-8">
+        
+        {/* Key Metrics Section */}
+        <DashboardMetrics 
+          completionStats={completionStats}
+          ratingDistribution={ratingDistribution}
+        />
+
+        {/* Critical Actions and Status Updates */}
+        <div className="space-y-4 lg:space-y-6 mb-6 lg:mb-8">
+          
+          {/* Critical Actions Alert */}
+          <CriticalActionsAlert completionStats={completionStats} />
+
+          {/* Overdue Drafts and Pending Approvals Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+            <OverdueDraftsCard overdueDrafts={overdueDrafts} />
+            <PendingApprovalsCard 
+              pendingApprovals={pendingApprovals}
+              overdueApprovalsCount={overdueApprovalsCount}
+            />
+          </div>
+        </div>
+
+        {/* Administrative Actions Panel */}
+        <AdministrativeActionsPanel 
+          onExportCenterOpen={() => setIsExportCenterOpen(true)}
+        />
+      </main>
+
+      {/* Enhanced Footer */}
+      <footer className="border-t border-gray-200/50 bg-white/80 backdrop-blur-lg mt-8 lg:mt-12">
+        <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-6">
+          <div className="flex flex-col items-center gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm text-gray-600 text-center sm:text-start">
+              <span className="font-medium">{t.dashboard.lastUpdated}: </span>
+              <span className="inline">{currentTime || t.common.loading}</span>
+            </div>
+            <div className="text-xs text-gray-500 text-center sm:text-end font-medium">
+              {t.auth.copyright}
+            </div>
+          </div>
+        </div>
+      </footer>
+
+      {/* PDF Export Center Modal */}
+      <PDFExportCenter 
+        isOpen={isExportCenterOpen}
+        onClose={() => setIsExportCenterOpen(false)}
+        companyId={companyId}
+      />
+    </div>
+  )
+}

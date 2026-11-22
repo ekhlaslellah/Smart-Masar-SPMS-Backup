@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  
+  /* Smart Masar Brand Colors (Teal / Royal Blue / Slate) */
+  --color-primary: #0f766e;          /* Teal-700 - Smart Masar Primary Brand Color */
+  --color-primary-hover: #115e59;    /* Teal-800 - Hover states */
+  --color-primary-light: #ccfbf1;    /* Teal-100 - Light backgrounds */
+  --color-primary-dark: #134e4a;     /* Teal-900 - Dark variants */
+  
+  /* Semantic Colors */
+  --color-success: #10b981;          /* Emerald-500 - Success states */
+  --color-success-light: #d1fae5;    /* Emerald-100 - Success backgrounds */
+  --color-success-dark: #047857;     /* Emerald-700 - Success text */
+  
+  --color-warning: #f59e0b;          /* Amber-500 - Warning states */
+  --color-warning-light: #fef3c7;    /* Amber-100 - Warning backgrounds */
+  --color-warning-dark: #d97706;     /* Amber-700 - Warning text */
+  
+  --color-error: #ef4444;            /* Red-500 - Error states */
+  --color-error-light: #fecaca;      /* Red-100 - Error backgrounds */
+  --color-error-dark: #dc2626;       /* Red-700 - Error text */
+  
+  /* Neutral Scale */
+  --color-gray-50: #f8fafc;          /* Light backgrounds */
+  --color-gray-100: #f1f5f9;         /* Subtle backgrounds */
+  --color-gray-200: #e2e8f0;         /* Borders */
+  --color-gray-300: #cbd5e1;         /* Inactive elements */
+  --color-gray-400: #94a3b8;         /* Placeholders */
+  --color-gray-500: #64748b;         /* Secondary text */
+  --color-gray-600: #475569;         /* Icons */
+  --color-gray-700: #334155;         /* Primary text alternative */
+  --color-gray-800: #1e293b;         /* Dark text */
+  --color-gray-900: #0f172a;         /* Primary text */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-cairo), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-arabic: var(--font-cairo), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  
+  /* Semantic Color Tokens for Tailwind */
+  --color-primary: var(--color-primary);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--color-gray-100);
+  --color-secondary-foreground: var(--color-gray-900);
+  --color-muted: var(--color-gray-100);
+  --color-muted-foreground: var(--color-gray-500);
+  --color-accent: var(--color-primary-light);
+  --color-accent-foreground: var(--color-primary-dark);
+  --color-destructive: var(--color-error);
+  --color-destructive-foreground: #ffffff;
+  --color-border: var(--color-gray-200);
+  --color-input: var(--color-gray-200);
+  --color-ring: var(--color-primary);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-cairo), var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}

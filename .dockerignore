@@ -1,0 +1,94 @@
+# Build artifacts
+Dockerfile
+.dockerignore
+node_modules
+.next
+.vercel
+dist
+build
+out
+
+# Development files
+npm-debug.log
+yarn-error.log
+*.log
+.DS_Store
+*.swp
+*.swo
+*~
+.idea
+.vscode
+*.sublime-*
+
+# Git
+.git
+.gitignore
+.github
+
+# Environment files
+.env
+.env.*
+!.env.example
+# Keep production environment templates
+!.env.production
+!.env.company1
+!.env.company2
+
+# Test coverage
+coverage
+.nyc_output
+jest.config.*
+__tests__
+*.test.*
+*.spec.*
+
+# Database files
+prisma/dev.db*
+prisma/*.db
+prisma/*.db-journal
+*.sqlite
+*.sqlite3
+
+# Documentation (exclude most but keep essential)
+README.md
+CLAUDE.md
+docs/
+*.md
+# Keep deployment documentation
+!docs/deployment/
+!SECURITY.md
+!VERSIONING.md
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Package manager cache (but NOT lock files - those are needed!)
+.yarn/cache
+.yarn/install-state.gz
+.pnp.*
+.npm
+
+# Temporary files
+tmp
+temp
+.tmp
+
+# Scripts (exclude most but keep essential)
+scripts/
+!scripts/docker-setup.sh
+
+# Certificates (security - never include in image)
+certificates/
+*.pem
+*.key
+*.crt
+*.p12
+
+# Data directories (should be mounted as volumes)
+data/
+public/example-*.csv
+
+# Development/analysis files
+example-users.csv
+*.csv

@@ -1,0 +1,8 @@
+{
+  "name": "Smart Masar SPMS — منظومة إدارة الاستراتيجية والأهداف والأداء المؤسسي",
+  "description": "المنظومة الرقمية المتكاملة لإدارة الاستراتيجية والأهداف المؤسسية واتفاقيات الأداء الوظيفي في سمارت مسار (Smart Masar).",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
