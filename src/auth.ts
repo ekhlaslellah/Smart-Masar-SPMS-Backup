@@ -14,7 +14,15 @@ import Credentials from 'next-auth/providers/credentials'
 import { authenticateUser } from '@/lib/auth'
 import type { NextAuthConfig } from 'next-auth'
 
+const runtimeSecret =
+  process.env.AUTH_SECRET ||
+  process.env.NEXTAUTH_SECRET ||
+  (process.env.NODE_ENV !== 'production'
+    ? btoa(process.env.K_SERVICE || process.env.PORT || 'dev-preview-runtime').repeat(2)
+    : undefined)
+
 export const config = {
+  secret: runtimeSecret,
   trustHost: true, // Allow localhost and preview hosts
   providers: [
     Credentials({

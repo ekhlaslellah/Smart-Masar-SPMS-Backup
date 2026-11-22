@@ -195,6 +195,7 @@ export default function LoginPage() {
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     dir="ltr"
+                    suppressHydrationWarning
                     className="block w-full appearance-none rounded-xl border border-slate-300 px-3.5 py-2.5 placeholder-slate-400 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20 text-sm text-slate-900 text-start"
                     placeholder="hr@demo.com / manager@demo.com"
                   />
@@ -214,6 +215,7 @@ export default function LoginPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       dir="ltr"
+                      suppressHydrationWarning
                       className="block w-full appearance-none rounded-xl border border-slate-300 px-3.5 py-2.5 pe-10 placeholder-slate-400 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20 text-sm text-slate-900 text-start"
                       placeholder={t.auth.password}
                     />
