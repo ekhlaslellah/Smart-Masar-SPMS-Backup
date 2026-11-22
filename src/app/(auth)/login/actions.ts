@@ -21,7 +21,7 @@ export async function loginWithCredentials(formData: FormData) {
     await signIn('credentials', {
       identifier,
       password,
-      redirectTo: '/',
+      redirectTo: '/auth/after-login',
     })
   } catch (error) {
     if (error instanceof AuthError) {
