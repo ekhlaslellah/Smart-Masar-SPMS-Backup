@@ -1,11 +1,27 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useFormStatus } from 'react-dom'
+import { loginWithCredentials } from './actions'
 import { signIn } from 'next-auth/react'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { LanguageSwitcher } from '@/components/layout'
 import { BiometricAuth } from '@/components/ui'
 import { ShieldCheck, Target, Layers, CheckCircle2, Eye, EyeOff } from 'lucide-react'
+
+function CredentialsSubmitButton({ label, loadingLabel, biometricLoading }: { label: string; loadingLabel: string; biometricLoading: boolean }) {
+  const { pending } = useFormStatus()
+
+  return (
+    <button
+      type="submit"
+      disabled={pending || biometricLoading}
+      className="flex w-full justify-center items-center rounded-xl border border-transparent bg-teal-700 py-3 px-4 text-sm font-bold text-white shadow-md hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all min-h-[44px]"
+    >
+      {pending || biometricLoading ? loadingLabel : label}
+    </button>
+  )
+}
 
 export default function LoginPage() {
   const [identifier, setIdentifier] = useState('')
@@ -15,34 +31,13 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const { t, isRTL } = useLanguage()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-
-    try {
-      const result = await signIn('credentials', {
-        identifier,
-        password,
-        redirect: false
-      })
-
-      if (result?.error) {
-        setError(t.auth.invalidCredentials)
-        setLoading(false)
-      } else {
-        fetch('/api/auth/update-last-login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        }).catch(() => {})
-        
-        window.location.href = '/'
-      }
-    } catch {
-      setError(t.auth.loginFailed)
-      setLoading(false)
+  // If a login failed on the server, show a message instead of silently
+  // returning to an unchanged login screen.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('error') === 'credentials') {
+      setError(t.auth.invalidCredentials)
     }
-  }
+  }, [t.auth.invalidCredentials])
 
   const handleBiometricSuccess = async (credentialId: string, user?: unknown) => {
     setLoading(true)
@@ -175,7 +170,7 @@ export default function LoginPage() {
                 </p>
               </div>
 
-              <form className="space-y-5" onSubmit={handleSubmit}>
+              <form className="space-y-5" action={loginWithCredentials} suppressHydrationWarning>
                 {error && (
                   <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-medium">
                     {error}
@@ -234,13 +229,11 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex w-full justify-center items-center rounded-xl border border-transparent bg-teal-700 py-3 px-4 text-sm font-bold text-white shadow-md hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all min-h-[44px]"
-                >
-                  {loading ? t.auth.signingIn : t.auth.signIn}
-                </button>
+                <CredentialsSubmitButton
+                  label={t.auth.signIn}
+                  loadingLabel={t.auth.signingIn}
+                  biometricLoading={loading}
+                />
               </form>
 
               {/* Biometric Authentication Option */}
