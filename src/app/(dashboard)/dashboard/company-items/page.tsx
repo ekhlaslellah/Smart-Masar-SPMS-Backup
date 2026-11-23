@@ -2,6 +2,7 @@ import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma-client'
 import { isAIEnabled } from '@/lib/ai-features'
+import { countArchivedItemsByType } from '@/lib/actions/evaluations/evaluation-items-archive-helpers'
 import CompanyItemsClient from './CompanyItemsClient'
 
 interface CompanyEvaluationItem {
@@ -18,78 +19,62 @@ interface CompanyEvaluationItem {
   createdAt: string
 }
 
-
 async function getCompanyItems(companyId: string): Promise<CompanyEvaluationItem[]> {
-  // Use raw query to handle schema transition - exclude archived items
-  const items = await prisma.$queryRaw`
-    SELECT 
-      ei.*,
-      c.name as creatorName,
-      c.role as creatorRole,
-      du.name as deadlineSetByName
-    FROM EvaluationItem ei
-    LEFT JOIN User c ON ei.createdBy = c.id
-    LEFT JOIN User du ON ei.deadlineSetBy = du.id
-    WHERE ei.companyId = ${companyId}
-      AND ei.level = 'company'
-      AND (ei.archivedAt IS NULL OR ei.archivedAt = '')
-    ORDER BY ei.active DESC, ei.createdAt DESC
-  ` as Array<{
-    id: string
-    title: string
-    description: string
-    type: string
-    level: string
-    active: boolean
-    createdAt: Date
-    evaluationDeadline: Date | null
-    creatorName: string | null
-    creatorRole: string | null
-    deadlineSetByName: string | null
-  }>
+  const items = await prisma.evaluationItem.findMany({
+    where: {
+      companyId,
+      level: 'company',
+      archivedAt: null
+    },
+    include: {
+      creator: {
+        select: {
+          name: true,
+          role: true
+        }
+      },
+      deadlineSetByUser: {
+        select: {
+          name: true
+        }
+      }
+    },
+    orderBy: [
+      { active: 'desc' },
+      { createdAt: 'desc' }
+    ]
+  })
 
-  // Transform the raw query results to match the expected interface
   return items.map((item) => ({
     id: item.id,
     title: item.title,
     description: item.description,
     type: item.type as 'okr' | 'competency',
     level: 'company' as const,
-    createdBy: item.creatorName || 'Unknown',
-    creatorRole: item.creatorRole || 'unknown',
+    createdBy: item.creator?.name || 'Unknown',
+    creatorRole: item.creator?.role || 'unknown',
     evaluationDeadline: item.evaluationDeadline?.toISOString() || null,
-    deadlineSetBy: item.deadlineSetByName || null,
+    deadlineSetBy: item.deadlineSetByUser?.name || null,
     active: item.active,
     createdAt: item.createdAt.toISOString()
   }))
 }
 
-async function getArchivedItemsCount(companyId: string): Promise<{ okrs: number, competencies: number }> {
+async function getArchivedItemsCount(companyId: string): Promise<{ okrs: number; competencies: number }> {
   try {
-    // Use raw query to handle new schema fields during transition
-    const results = await prisma.$queryRaw`
-      SELECT 
-        type,
-        COUNT(*) as count
-      FROM EvaluationItem 
-      WHERE companyId = ${companyId}
-        AND level = 'company'
-        AND archivedAt IS NOT NULL
-      GROUP BY type
-    ` as Array<{ type: string; count: number }>
-
-    let okrs = 0
-    let competencies = 0
-
-    results.forEach(result => {
-      if (result.type === 'okr') {
-        okrs = Number(result.count)
-      } else if (result.type === 'competency') {
-        competencies = Number(result.count)
+    const results = await prisma.evaluationItem.groupBy({
+      by: ['type'],
+      where: {
+        companyId,
+        level: 'company',
+        archivedAt: { not: null }
+      },
+      _count: {
+        _all: true
       }
     })
 
-    return { okrs, competencies }
+    return countArchivedItemsByType(results)
   } catch (error) {
     console.error('Error fetching archived items count:', error)
     return { okrs: 0, competencies: 0 }
