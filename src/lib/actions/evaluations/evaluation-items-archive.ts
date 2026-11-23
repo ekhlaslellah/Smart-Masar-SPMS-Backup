@@ -17,6 +17,7 @@ import { prisma } from '@/lib/prisma-client'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { toISOStringSafe } from '@/lib/utils/date'
 import { createItemAuditLog, transformArchivedItem } from './evaluation-items-utils'
+import { evaluationDataReferencesItem } from './evaluation-items-archive-helpers'
 import type { EvaluationItemResult, FormattedArchivedItem } from './evaluation-items-types'
 
 /**
@@ -52,14 +53,15 @@ export async function archiveEvaluationItem(itemId: string, reason?: string): Pr
       return { success: false, error: 'Item not found or is still active. Please deactivate the item first.' }
     }
 
-    // Archive the item using raw SQL to handle new schema fields
-    await prisma.$executeRaw`
-      UPDATE EvaluationItem 
-      SET archivedAt = ${new Date()},
-          archivedBy = ${userId},
-          archivedReason = ${reason || 'Archived by HR'}
-      WHERE id = ${itemId}
-    `
+    // Archive the item
+    await prisma.evaluationItem.update({
+      where: { id: itemId },
+      data: {
+        archivedAt: new Date(),
+        archivedBy: userId,
+        archivedReason: reason || 'Archived by HR'
+      }
+    })
 
     // Audit log for archiving
     await createItemAuditLog(
@@ -112,47 +114,53 @@ export async function getArchivedEvaluationItems(): Promise<EvaluationItemResult
       return { success: false, error: 'Only HR can view archived items' }
     }
 
-    // Get archived company-wide items using raw SQL
-    const archivedItems = await prisma.$queryRaw`
-      SELECT 
-        ei.id,
-        ei.title,
-        ei.description,
-        ei.type,
-        ei.level,
-        ei.active,
-        ei.createdAt,
-        ei.archivedAt,
-        ei.archivedReason,
-        c.name as creatorName,
-        c.role as creatorRole,
-        au.name as archivedByName,
-        au.role as archivedByRole
-      FROM EvaluationItem ei
-      LEFT JOIN User c ON ei.createdBy = c.id
-      LEFT JOIN User au ON ei.archivedBy = au.id
-      WHERE ei.companyId = ${companyId}
-        AND ei.level = 'company'
-        AND ei.archivedAt IS NOT NULL
-      ORDER BY ei.archivedAt DESC, ei.createdAt DESC
-    ` as Array<{
-      id: string
-      title: string
-      description: string
-      type: string
-      level: string
-      active: boolean
-      createdAt: Date
-      archivedAt: Date | null
-      archivedReason: string | null
-      creatorName: string | null
-      creatorRole: string | null
-      archivedByName: string | null
-      archivedByRole: string | null
-    }>
+    // Get archived company-wide items
+    const archivedItems = await prisma.evaluationItem.findMany({
+      where: {
+        companyId,
+        level: 'company',
+        archivedAt: { not: null }
+      },
+      include: {
+        creator: {
+          select: {
+            name: true,
+            role: true
+          }
+        },
+        archivedByUser: {
+          select: {
+            name: true,
+            role: true
+          }
+        }
+      },
+      orderBy: [
+        { archivedAt: 'desc' },
+        { createdAt: 'desc' }
+      ]
+    })
 
     // Transform to match expected format
-    const formattedItems = await Promise.all(archivedItems.map(transformArchivedItem))
+    const formattedItems = await Promise.all(
+      archivedItems.map((item) =>
+        transformArchivedItem({
+          id: item.id,
+          title: item.title,
+          description: item.description,
+          type: item.type,
+          level: item.level,
+          active: item.active,
+          createdAt: item.createdAt,
+          archivedAt: item.archivedAt,
+          archivedReason: item.archivedReason,
+          creatorName: item.creator?.name ?? null,
+          creatorRole: item.creator?.role ?? null,
+          archivedByName: item.archivedByUser?.name ?? null,
+          archivedByRole: item.archivedByUser?.role ?? null
+        })
+      )
+    )
 
     return { success: true, items: formattedItems }
 
@@ -182,39 +190,40 @@ export async function unarchiveEvaluationItem(itemId: string): Promise<Evaluatio
       return { success: false, error: 'Only HR can unarchive company-wide items' }
     }
 
-    // Check if item exists and is archived using raw SQL
-    const existingItems = await prisma.$queryRaw`
-      SELECT id, title, description, type, level, active, createdAt, archivedAt, archivedReason
-      FROM EvaluationItem 
-      WHERE id = ${itemId} 
-        AND companyId = ${companyId} 
-        AND archivedAt IS NOT NULL
-    ` as Array<{
-      id: string
-      title: string
-      description: string
-      type: string
-      level: string
-      active: boolean
-      createdAt: Date
-      archivedAt: Date | null
-      archivedReason: string | null
-    }>
+    // Check if item exists and is archived
+    const existingItem = await prisma.evaluationItem.findFirst({
+      where: {
+        id: itemId,
+        companyId,
+        archivedAt: { not: null }
+      },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        type: true,
+        level: true,
+        active: true,
+        createdAt: true,
+        archivedAt: true,
+        archivedReason: true
+      }
+    })
 
-    const existingItem = existingItems[0]
     if (!existingItem) {
       return { success: false, error: 'Archived item not found' }
     }
 
     // Unarchive the item by clearing archive fields but keeping it inactive
-    await prisma.$executeRaw`
-      UPDATE EvaluationItem 
-      SET archivedAt = NULL,
-          archivedBy = NULL,
-          archivedReason = NULL,
-          active = ${false}
-      WHERE id = ${itemId}
-    `
+    await prisma.evaluationItem.update({
+      where: { id: itemId },
+      data: {
+        archivedAt: null,
+        archivedBy: null,
+        archivedReason: null,
+        active: false
+      }
+    })
 
     // Audit log for unarchiving
     await createItemAuditLog(
@@ -268,47 +277,55 @@ export async function deleteArchivedEvaluationItem(itemId: string): Promise<Eval
       return { success: false, error: 'Only HR can delete company-wide items' }
     }
 
-    // Check if item exists and is archived using raw SQL
-    const existingItems = await prisma.$queryRaw`
-      SELECT id, title, description, type, level, active, createdAt, archivedAt, archivedReason
-      FROM EvaluationItem 
-      WHERE id = ${itemId} 
-        AND companyId = ${companyId} 
-        AND archivedAt IS NOT NULL
-    ` as Array<{
-      id: string
-      title: string
-      description: string
-      type: string
-      level: string
-      active: boolean
-      createdAt: Date
-      archivedAt: Date | null
-      archivedReason: string | null
-    }>
+    // Check if item exists and is archived
+    const existingItem = await prisma.evaluationItem.findFirst({
+      where: {
+        id: itemId,
+        companyId,
+        archivedAt: { not: null }
+      },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        type: true,
+        level: true,
+        active: true,
+        createdAt: true,
+        archivedAt: true,
+        archivedReason: true
+      }
+    })
 
-    const existingItem = existingItems[0]
     if (!existingItem) {
       return { success: false, error: 'Archived item not found' }
     }
 
-    // Check if item has associated evaluations or assessments using raw SQL
-    const evaluationCheck = await prisma.$queryRaw`
-      SELECT COUNT(*) as count
-      FROM Evaluation e
-      INNER JOIN EvaluationItemData eid ON e.id = eid.evaluationId
-      WHERE e.companyId = ${companyId} AND eid.evaluationItemId = ${itemId}
-    ` as Array<{ count: number }>
+    // Check if item has associated evaluations or assessments
+    const candidateEvaluations = await prisma.evaluation.findMany({
+      where: {
+        companyId,
+        evaluationItemsData: {
+          contains: itemId
+        }
+      },
+      select: {
+        evaluationItemsData: true
+      }
+    })
 
-    const assessmentCheck = await prisma.$queryRaw`
-      SELECT COUNT(*) as count  
-      FROM PartialAssessment pa
-      INNER JOIN PartialAssessmentItem pai ON pa.id = pai.partialAssessmentId
-      WHERE pa.companyId = ${companyId} AND pai.evaluationItemId = ${itemId}
-    ` as Array<{ count: number }>
+    const hasEvaluations = candidateEvaluations.some((evaluation) =>
+      evaluationDataReferencesItem(evaluation.evaluationItemsData, itemId)
+    )
 
-    const hasEvaluations = evaluationCheck[0]?.count > 0
-    const hasAssessments = assessmentCheck[0]?.count > 0
+    const assessmentCount = await prisma.partialAssessment.count({
+      where: {
+        companyId,
+        evaluationItemId: itemId
+      }
+    })
+
+    const hasAssessments = assessmentCount > 0
 
     if (hasEvaluations || hasAssessments) {
       return { 
@@ -317,11 +334,12 @@ export async function deleteArchivedEvaluationItem(itemId: string): Promise<Eval
       }
     }
 
-    // Delete individual assignments first (if any) using raw SQL
-    await prisma.$executeRaw`
-      DELETE FROM IndividualAssignment 
-      WHERE evaluationItemId = ${itemId}
-    `
+    // Delete individual assignments first (if any)
+    await prisma.evaluationItemAssignment.deleteMany({
+      where: {
+        evaluationItemId: itemId
+      }
+    })
 
     // Audit log before deletion
     await createItemAuditLog(

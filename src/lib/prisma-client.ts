@@ -15,9 +15,9 @@ declare global {
   var __prisma: PrismaClient | undefined
 }
 
-const databaseUrl =
-  process.env.DATABASE_URL ||
-  (process.env.NODE_ENV !== 'production' ? 'file:./dev.db' : undefined)
+// Always use the explicitly configured PostgreSQL connection in this branch.
+// Never silently fall back to the checked-in SQLite development database.
+const databaseUrl = process.env.DATABASE_URL
 
 export const prisma =
   globalThis.__prisma ||

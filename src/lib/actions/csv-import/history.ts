@@ -107,7 +107,7 @@ export async function rollbackImport(auditLogId: string): Promise<{
       where: {
         action: 'csv_import_rollback',
         metadata: {
-          path: 'originalImportId',
+          path: ['originalImportId'],
           equals: auditLogId
         }
       }
