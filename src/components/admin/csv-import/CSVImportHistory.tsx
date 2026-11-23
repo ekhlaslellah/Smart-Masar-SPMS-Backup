@@ -14,6 +14,7 @@ import {
   CheckCircle,
   AlertTriangle
 } from 'lucide-react'
+import { formatDateDeterministic, formatTimeDeterministic } from '@/lib/utils/date'
 import type { ImportHistoryEntry } from '@/lib/actions/csv-import'
 
 interface CSVImportHistoryProps {
@@ -65,8 +66,8 @@ export function CSVImportHistory({
   const formatTimestamp = (timestamp: Date | string) => {
     const date = new Date(timestamp)
     return {
-      date: date.toLocaleDateString(),
-      time: date.toLocaleTimeString(),
+      date: formatDateDeterministic(date),
+      time: formatTimeDeterministic(date),
       relative: getRelativeTime(date)
     }
   }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useLanguage } from '@/contexts/LanguageContext'
+import { formatDateDeterministic } from '@/lib/utils/date'
 import { CheckCircle, XCircle, Archive, Circle } from 'lucide-react'
 
 interface PerformanceCycle {
@@ -44,7 +45,7 @@ export function CyclesList({ cycles, onStatusUpdate, onDeleteClick, isPending }:
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString()
+    return formatDateDeterministic(dateString)
   }
 
   return (

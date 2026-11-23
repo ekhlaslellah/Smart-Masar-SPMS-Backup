@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Clock, Globe, Play, Pause, Settings, Trash2 } from 'lucide-react'
 import { getStatusBadge, getFrequencyLabel } from '../utils'
+import { formatDateTimeDeterministic } from '@/lib/utils/date'
 import type { ScheduledImportCardProps } from '../types'
 import type { ScheduledImportConfig } from '@/lib/actions/scheduled-import'
 
@@ -53,12 +54,12 @@ export function ScheduledImportCard({
               </div>
               {scheduledImport.lastRun && (
                 <div className="flex items-center gap-2 text-gray-700">
-                  <span>{t.users.lastRun || 'Last run'}: {new Date(scheduledImport.lastRun).toLocaleString()}</span>
+                  <span>{t.users.lastRun || 'Last run'}: {formatDateTimeDeterministic(scheduledImport.lastRun)}</span>
                 </div>
               )}
               {scheduledImport.nextRun && (
                 <div className="flex items-center gap-2 text-gray-700">
-                  <span>{t.users.nextRun || 'Next run'}: {new Date(scheduledImport.nextRun).toLocaleString()}</span>
+                  <span>{t.users.nextRun || 'Next run'}: {formatDateTimeDeterministic(scheduledImport.nextRun)}</span>
                 </div>
               )}
               {scheduledImport.errorMessage && (

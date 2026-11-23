@@ -6,6 +6,7 @@ import { BiometricAuth, LoadingSpinner } from '@/components/ui'
 import { getBiometricCredentials, removeBiometricCredential } from '@/lib/actions/biometric'
 import { useToast } from '@/hooks/useToast'
 import ChangePasswordModal from './ChangePasswordModal'
+import { formatDateDeterministic } from '@/lib/utils/date'
 import type { User } from 'next-auth'
 
 interface BiometricCredential {
@@ -127,7 +128,7 @@ export default function SettingsClient({ user }: SettingsClientProps) {
 
   const formatDate = (date: Date | null) => {
     if (!date) return t.common?.never || 'Never'
-    return new Date(date).toLocaleDateString()
+    return formatDateDeterministic(date, t.common?.never || 'Never')
   }
 
   return (

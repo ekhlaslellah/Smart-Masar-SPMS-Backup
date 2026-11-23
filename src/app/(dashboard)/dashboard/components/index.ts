@@ -1,5 +1,6 @@
 export { DashboardHeader } from './DashboardHeader'
 export { DashboardMetrics } from './DashboardMetrics'
+export { PerformanceRatingTrendsChart } from './PerformanceRatingTrendsChart'
 export { CriticalActionsAlert } from './CriticalActionsAlert'
 export { OverdueDraftsCard } from './OverdueDraftsCard'
 export { PendingApprovalsCard } from './PendingApprovalsCard'

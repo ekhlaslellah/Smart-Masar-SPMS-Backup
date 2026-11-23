@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { getCycle } from '@/lib/actions/cycles'
+import { formatDateDeterministic } from '@/lib/utils/date'
 
 interface CycleStatusBannerProps {
   cycleId?: string | null
@@ -108,7 +109,7 @@ export default function CycleStatusBanner({ cycleId, userRole, className = '' }:
           </p>
           {cycle.closedAt && (
             <p className="text-xs mt-1 opacity-75">
-              {t.dashboard.closedOn} {new Date(cycle.closedAt).toLocaleDateString()}
+              {t.dashboard.closedOn} {formatDateDeterministic(cycle.closedAt)}
             </p>
           )}
         </div>

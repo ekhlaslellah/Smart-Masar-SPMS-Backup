@@ -9,6 +9,7 @@ import { useLanguage } from '@/contexts/LanguageContext'
 import { LanguageSwitcher } from '@/components/layout'
 import { useRouter } from 'next/navigation'
 import { getStatusColor, getStatusLabel } from '../utils'
+import { formatDateDeterministic } from '@/lib/utils/date'
 import type { EvaluationHeaderProps } from '../types'
 
 export function EvaluationHeader({
@@ -86,7 +87,7 @@ export function EvaluationHeader({
             </div>
             <div className="text-xs text-gray-500">
               {t.evaluations.evaluation} by {evaluation.manager.name} • 
-              {new Date(evaluation.createdAt).toLocaleDateString()}
+              {formatDateDeterministic(evaluation.createdAt)}
             </div>
           </div>
           

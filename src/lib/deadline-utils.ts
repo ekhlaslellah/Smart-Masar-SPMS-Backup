@@ -47,24 +47,34 @@ export interface DeadlineInfo {
 }
 
 /**
- * Calculate days remaining and deadline information
+ * Calculate days remaining and deadline information using deterministic UTC calendar days.
  */
-export function calculateDeadlineInfo(deadline: string | null): DeadlineInfo | null {
+export function calculateDeadlineInfo(
+  deadline: string | null,
+  referenceDate: Date = new Date()
+): DeadlineInfo | null {
   if (!deadline) return null
 
   const deadlineDate = new Date(deadline)
-  const today = new Date()
-  
-  // Reset time components for accurate day calculation
-  today.setHours(0, 0, 0, 0)
-  deadlineDate.setHours(0, 0, 0, 0)
-  
-  const timeDiff = deadlineDate.getTime() - today.getTime()
-  const daysRemaining = Math.ceil(timeDiff / (1000 * 60 * 60 * 24))
-  
+  if (Number.isNaN(deadlineDate.getTime())) return null
+
+  const deadlineUtcMs = Date.UTC(
+    deadlineDate.getUTCFullYear(),
+    deadlineDate.getUTCMonth(),
+    deadlineDate.getUTCDate()
+  )
+  const todayUtcMs = Date.UTC(
+    referenceDate.getUTCFullYear(),
+    referenceDate.getUTCMonth(),
+    referenceDate.getUTCDate()
+  )
+
+  const timeDiff = deadlineUtcMs - todayUtcMs
+  const daysRemaining = Math.round(timeDiff / (1000 * 60 * 60 * 24))
+
   const isOverdue = daysRemaining < 0
   const isToday = daysRemaining === 0
-  
+
   // Determine urgency level
   let urgencyLevel: 'high' | 'medium' | 'low' | 'overdue'
   if (isOverdue) {
@@ -76,14 +86,13 @@ export function calculateDeadlineInfo(deadline: string | null): DeadlineInfo | n
   } else {
     urgencyLevel = 'low'
   }
-  
-  // Format date for display
-  const formattedDate = deadlineDate.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  })
-  
+
+  // Deterministic UTC YYYY-MM-DD date string (prevents SSR/client locale/timezone drift)
+  const year = deadlineDate.getUTCFullYear()
+  const month = String(deadlineDate.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(deadlineDate.getUTCDate()).padStart(2, '0')
+  const formattedDate = `${year}-${month}-${day}`
+
   return {
     daysRemaining: Math.abs(daysRemaining),
     isOverdue,

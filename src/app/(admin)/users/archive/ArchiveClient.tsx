@@ -8,6 +8,7 @@ import { LanguageSwitcher } from '@/components/layout'
 import { useToast } from '@/hooks/useToast'
 import { ToastContainer } from '@/components/ui'
 import { unarchiveUser, deleteUser } from '@/lib/actions/users'
+import { formatDateDeterministic } from '@/lib/utils/date'
 import { ChevronLeft, Archive, Search, X, History, RotateCcw, CheckCircle, Trash2 } from 'lucide-react'
 import { DeleteArchivedUserModal } from './components'
 import type { User, Company } from '@/types'
@@ -146,9 +147,7 @@ export default function ArchiveClient({
   }
 
   const formatDate = (date: Date | null | string) => {
-    if (!date) return 'N/A'
-    const d = typeof date === 'string' ? new Date(date) : date
-    return d.toLocaleDateString()
+    return formatDateDeterministic(date, 'N/A')
   }
 
   const toggleUserExpansion = (userId: string) => {

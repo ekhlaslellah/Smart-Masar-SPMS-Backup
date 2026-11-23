@@ -38,7 +38,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
-      <body className={`${cairo.variable} ${geist.variable} ${geistMono.variable} font-sans antialiased`}>
+      <body
+        className={`${cairo.variable} ${geist.variable} ${geistMono.variable} font-sans antialiased`}
+        suppressHydrationWarning
+      >
         <LanguageProvider>
           <AuthProvider>
             {children}

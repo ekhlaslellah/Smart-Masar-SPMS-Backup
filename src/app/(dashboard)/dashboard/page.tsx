@@ -45,6 +45,7 @@ import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma-client'
 import DashboardClient from './DashboardClient'
+import { buildSixMonthRatingTrends, getSixMonthWindowStart } from './rating-trends'
 import type { EvaluationCycle } from '@/types'
 
 interface CompletionStats {
@@ -288,10 +289,36 @@ async function getDashboardData(companyId: string) {
     _count: cycle._count
   }))
 
+  // Fetch company-wide rated evaluations across the last 6 calendar months
+  const now = new Date()
+  const sixMonthStart = getSixMonthWindowStart(now)
+  const sixMonthRatedEvaluations = await prisma.evaluation.findMany({
+    where: {
+      companyId,
+      status: { in: ['completed', 'submitted'] },
+      overallRating: { not: null },
+      updatedAt: { gte: sixMonthStart },
+      employee: {
+        active: true
+      },
+      manager: {
+        active: true
+      }
+    },
+    select: {
+      overallRating: true,
+      updatedAt: true,
+      createdAt: true
+    }
+  })
+
+  const ratingTrends = buildSixMonthRatingTrends(sixMonthRatedEvaluations, now)
+
   return {
     company,
     completionStats,
     ratingDistribution: ratingCounts,
+    ratingTrends,
     activeCycle: activeCycle as EvaluationCycle | null,
     allCycles: formattedCycles,
     overdueDrafts: overdueDrafts.map(e => ({
@@ -333,7 +360,17 @@ export default async function DashboardPage() {
   }
 
   // Fetch dashboard data directly from database
-  const { company, completionStats, ratingDistribution, activeCycle, allCycles, overdueDrafts, pendingApprovals, overdueApprovalsCount } = await getDashboardData(companyId)
+  const {
+    company,
+    completionStats,
+    ratingDistribution,
+    ratingTrends,
+    activeCycle,
+    allCycles,
+    overdueDrafts,
+    pendingApprovals,
+    overdueApprovalsCount
+  } = await getDashboardData(companyId)
 
   return (
     <DashboardClient 
@@ -342,6 +379,7 @@ export default async function DashboardPage() {
       companyName={company?.name || 'Company'}
       completionStats={completionStats}
       ratingDistribution={ratingDistribution}
+      ratingTrends={ratingTrends}
       activeCycle={activeCycle}
       allCycles={allCycles}
       overdueDrafts={overdueDrafts}

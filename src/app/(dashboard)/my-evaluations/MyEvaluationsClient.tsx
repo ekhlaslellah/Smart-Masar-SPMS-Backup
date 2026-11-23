@@ -5,6 +5,7 @@ import { signOut } from 'next-auth/react'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { LanguageSwitcher } from '@/components/layout'
 import type { EvaluationCycle } from '@/types'
+import { formatDateDeterministic } from '@/lib/utils/date'
 import { FileText, Target, Clock, Edit, AlertTriangle } from 'lucide-react'
 
 interface Evaluation {
@@ -375,7 +376,7 @@ export default function MyEvaluationsClient({ evaluations, userName, activeCycle
                     <p className="text-base text-gray-600">
                       {t.nav.evaluatedBy
                         .replace('{manager}', evaluation.managerName)
-                        .replace('{date}', evaluation.submittedAt ? new Date(evaluation.submittedAt).toLocaleDateString() : '')
+                        .replace('{date}', formatDateDeterministic(evaluation.submittedAt))
                       }
                     </p>
                   </div>

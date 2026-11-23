@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { LanguageSwitcher } from '@/components/layout'
 import { exportAuditLogsToExcel } from '@/lib/services/audit-export'
+import { formatDateTimeDeterministic } from '@/lib/utils/date'
 import { FileText, User, RotateCcw, Edit3, CheckCircle, BarChart3, File, ChevronLeft, Download, X, BarChart } from 'lucide-react'
 
 interface AuditLog {
@@ -126,7 +127,7 @@ export default function AuditDashboard({
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString()
+    return formatDateTimeDeterministic(dateString)
   }
 
   return (

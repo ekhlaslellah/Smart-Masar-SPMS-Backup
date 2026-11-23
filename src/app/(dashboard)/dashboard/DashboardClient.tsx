@@ -4,9 +4,11 @@ import { useState, useEffect } from 'react'
 import { PDFExportCenter } from '@/components/features/dashboard'
 import { useLanguage } from '@/contexts/LanguageContext'
 import type { EvaluationCycle } from '@/types'
+import type { RatingTrendPoint } from './rating-trends'
 import {
   DashboardHeader,
   DashboardMetrics,
+  PerformanceRatingTrendsChart,
   CriticalActionsAlert,
   OverdueDraftsCard,
   PendingApprovalsCard,
@@ -71,6 +73,7 @@ interface DashboardClientProps {
   companyName: string
   completionStats: CompletionStats
   ratingDistribution: RatingDistribution
+  ratingTrends: RatingTrendPoint[]
   activeCycle: EvaluationCycle | null
   allCycles: PerformanceCycle[]
   overdueDrafts: OverdueDraft[]
@@ -83,6 +86,7 @@ export default function DashboardClient({
   companyName,
   completionStats,
   ratingDistribution,
+  ratingTrends,
   activeCycle,
   allCycles,
   overdueDrafts,
@@ -123,6 +127,9 @@ export default function DashboardClient({
           completionStats={completionStats}
           ratingDistribution={ratingDistribution}
         />
+
+        {/* 6-Month Performance Rating Trends Line Chart */}
+        <PerformanceRatingTrendsChart data={ratingTrends} />
 
         {/* Critical Actions and Status Updates */}
         <div className="space-y-4 lg:space-y-6 mb-6 lg:mb-8">

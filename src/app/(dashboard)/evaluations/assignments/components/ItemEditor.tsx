@@ -2,7 +2,7 @@ import { useLanguage } from '@/contexts/LanguageContext'
 import type { EditingItem } from '../types'
 import { Building2, User, Target, Star, Wand2, Loader2, AlertCircle, RefreshCw } from 'lucide-react'
 import { improveTextWithAI } from '../actions'
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { useToast } from '@/hooks/useToast'
 
 interface ItemEditorProps {
@@ -54,6 +54,11 @@ export function ItemEditor({
     description: boolean
   }>({ title: false, description: false })
 
+  const [minDate, setMinDate] = useState<string | undefined>(undefined)
+
+  useEffect(() => {
+    setMinDate(new Date().toISOString().slice(0, 10))
+  }, [])
 
   if (!editingItem) return null
 
@@ -363,7 +368,7 @@ export function ItemEditor({
               value={editingItem.evaluationDeadline || ''}
               onChange={(e) => onUpdateItem({ evaluationDeadline: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm"
-              min={new Date().toISOString().slice(0, 10)}
+              min={minDate}
               disabled={isPending}
               lang={language}
             />

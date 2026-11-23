@@ -8,6 +8,7 @@ import { LanguageSwitcher } from '@/components/layout'
 import { ToastContainer } from '@/components/ui'
 import { useToast } from '@/hooks/useToast'
 import { unarchiveEvaluationItem, deleteArchivedEvaluationItem } from '@/lib/actions/evaluations'
+import { formatDateDeterministic } from '@/lib/utils/date'
 import { Target, Star, ChevronLeft, Archive, Calendar, User, Search, X, RotateCcw, Trash2, MoreVertical } from 'lucide-react'
 
 interface ArchivedCompanyEvaluationItem {
@@ -272,7 +273,7 @@ export default function ArchivedItemsClient({ archivedItems, archivedCount }: Ar
                         </div>
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          <span>{new Date(item.createdAt).toLocaleDateString()}</span>
+                          <span>{formatDateDeterministic(item.createdAt)}</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Archive className="h-3 w-3" />
@@ -280,7 +281,7 @@ export default function ArchivedItemsClient({ archivedItems, archivedCount }: Ar
                         </div>
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          <span>{item.archivedAt ? new Date(item.archivedAt).toLocaleDateString() : 'N/A'}</span>
+                          <span>{formatDateDeterministic(item.archivedAt, 'N/A')}</span>
                         </div>
                       </div>
                       
